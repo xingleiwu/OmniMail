@@ -142,6 +142,29 @@ describe('device token scopes', () => {
       EXTENSION_DEVICE_SCOPES,
       request('/api/icloud/inbox/42?accountId=icloud-1'),
     )).resolves.toBe(true)
+    const indexedReadPaths = [
+      '/api/gmail/accounts',
+      '/api/gmail/messages?q=code',
+      '/api/gmail/accounts/gmail-1/messages/message-1',
+      '/api/qq-mail/accounts',
+      '/api/qq-mail/messages?accountId=qq-1',
+      '/api/qq-mail/accounts/qq-1/messages/message-1',
+      '/api/microsoft/accounts',
+      '/api/microsoft/messages?accountId=microsoft-1',
+      '/api/microsoft/accounts/microsoft-1/messages/message-1',
+      '/api/naver-mail/accounts',
+      '/api/naver-mail/messages?accountId=naver-1',
+      '/api/naver-mail/accounts/naver-1/messages/message-1',
+      '/api/yandex-mail/accounts',
+      '/api/yandex-mail/messages?accountId=yandex-1',
+      '/api/yandex-mail/accounts/yandex-1/messages/message-1',
+    ]
+    for (const path of indexedReadPaths) {
+      await expect(deviceScopesAllow(
+        EXTENSION_DEVICE_SCOPES,
+        request(path),
+      ), path).resolves.toBe(true)
+    }
   })
 
   it('denies administrative and destructive APIs to extension tokens', async () => {
@@ -157,6 +180,32 @@ describe('device token scopes', () => {
     await expect(deviceScopesAllow(EXTENSION_DEVICE_SCOPES, request('/api/icloud/aliases/alias-1', 'DELETE'))).resolves.toBe(false)
     await expect(deviceScopesAllow(EXTENSION_DEVICE_SCOPES, request('/api/icloud/aliases/preview', 'POST'))).resolves.toBe(false)
     await expect(deviceScopesAllow(EXTENSION_DEVICE_SCOPES, request('/api/icloud/accounts/icloud-1/cookies', 'PUT'))).resolves.toBe(false)
+    const indexedWritesAndAttachments: Array<[string, string]> = [
+      ['/api/gmail/accounts', 'POST'],
+      ['/api/gmail/accounts/gmail-1/sync', 'POST'],
+      ['/api/gmail/accounts/gmail-1/messages/message-1/attachments/part-1', 'GET'],
+      ['/api/qq-mail/accounts', 'POST'],
+      ['/api/qq-mail/accounts/qq-1/sync', 'POST'],
+      ['/api/qq-mail/accounts/qq-1/identities', 'POST'],
+      ['/api/qq-mail/accounts/qq-1/messages', 'POST'],
+      ['/api/qq-mail/accounts/qq-1/messages/message-1/attachments/part-1', 'GET'],
+      ['/api/microsoft/accounts', 'POST'],
+      ['/api/microsoft/accounts/microsoft-1/sync', 'POST'],
+      ['/api/microsoft/accounts/microsoft-1/folders', 'GET'],
+      ['/api/microsoft/accounts/microsoft-1/messages/message-1/attachments/part-1', 'GET'],
+      ['/api/naver-mail/accounts', 'POST'],
+      ['/api/naver-mail/accounts/naver-1/sync', 'POST'],
+      ['/api/naver-mail/accounts/naver-1/messages/message-1/attachments/part-1', 'GET'],
+      ['/api/yandex-mail/accounts', 'POST'],
+      ['/api/yandex-mail/accounts/yandex-1/sync', 'POST'],
+      ['/api/yandex-mail/accounts/yandex-1/messages/message-1/attachments/part-1', 'GET'],
+    ]
+    for (const [path, method] of indexedWritesAndAttachments) {
+      await expect(deviceScopesAllow(
+        EXTENSION_DEVICE_SCOPES,
+        request(path, method),
+      ), `${method} ${path}`).resolves.toBe(false)
+    }
     await expect(deviceScopesAllow(
       EXTENSION_DEVICE_SCOPES,
       request('/api/messages/message-1', 'PATCH', { folder: 'trash' }),
