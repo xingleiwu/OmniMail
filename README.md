@@ -51,7 +51,7 @@
 
 | 产品层 | 当前版本 | 支持层级 | 职责与兼容关系 |
 | --- | --- | --- | --- |
-| Web + Worker API | [`1.0.0`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/v1.0.0) | 稳定兼容基线 | 核心服务、Webmail、数据和所有邮箱来源；自托管实例的唯一服务端 |
+| Web + Worker API | [`1.1.0`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/v1.1.0) | 稳定兼容基线 | 核心服务、Webmail、数据和所有邮箱来源；自托管实例的唯一服务端 |
 | OmniMail Float | [`1.0.0`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/float-v1.0.0) | 稳定兼容基线 | Chrome Manifest V3 浏览器协作层；连接 Web/API `1.x`，不直连第三方邮箱 |
 | Android | [`0.3.0`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/android-v0.3.0) | 独立预览版 | 原生移动客户端；仍处于 `0.x`，兼容承诺和发布节奏独立于 Web/Float |
 
@@ -66,6 +66,10 @@
   稳定契约；升级前应阅读对应 Android Release Notes。
 
 ### 1.x 兼容边界
+
+- Web `1.0.2 → 1.1.0` 需要应用 `0036`、`0037` 数据库迁移，使用 `npm run deploy` 自动处理。
+  全局密钥为可选配置，旧独立密钥继续兼容；启用全局密钥后须保留旧密钥直到历史凭据迁移完成。
+  完整升级步骤与回滚限制见 [Web 1.1.0 发布说明](docs/releases/web/v1.1.0.md)。
 
 - Float `1.x` 推荐连接 Web/API `1.x`；升级时先部署 Web，再更新扩展。
 - Float `0.8.1 → 1.0.0` 不增加 Chrome 权限或设备 Scope，不需要重新授权；Web
@@ -134,8 +138,8 @@ Serverless Webmail：
 
 - 仅支持已开通 iCloud+ 且拥有 **Hide My Email** 权限的 Apple 账号；“仅网页访问”、未开通 iCloud+ 或没有隐藏邮箱权限的账号无法添加。
 - 添加账号时需要从对应的 `icloud.com` / `icloud.com.cn` 会话导入 Cookie。Cookie 过期、复制不完整或 Apple 拒绝权限时，添加会失败并在弹窗显示原因，不会退出 OmniMail 当前登录账号。
-- `ICLOUD_CREDENTIALS_KEY` 必须配置为至少 32 字节的 Secret；更换或恢复部署时请确认该 Secret 没有丢失，否则无法解密已保存凭据。
-- `LINUX_DO_MAIL_CREDENTIALS_KEY` 必须配置为至少 32 字节的 Secret；它用于加密 Linux DO Mail 密码或认证令牌。
+- `MAIL_CREDENTIALS_KEY`（或兼容的 `ICLOUD_CREDENTIALS_KEY`）必须配置为至少 32 字节的 Secret；更换或恢复部署时请确认该 Secret 没有丢失，否则无法解密已保存凭据。
+- `MAIL_CREDENTIALS_KEY`（或兼容的 `LINUX_DO_MAIL_CREDENTIALS_KEY`）必须配置为至少 32 字节的 Secret；它用于加密 Linux DO Mail 密码或认证令牌。
 - 应用专用密码不是创建隐藏邮箱的必需项；只有需要通过 IMAP 按地址筛选或读取完整邮件正文时才需要配置，并且必须绑定当前 iCloud 邮箱。
 - iCloud 邮件和别名由 Worker 按需访问 Apple，不会同步进 OmniMail 收件箱；Apple 服务、订阅状态、区域限制和请求频率可能影响读取结果。
 - 不要把 Cookie 或应用专用密码提交到 Git、截图、工单或第三方聊天中；OmniMail 只在 Worker 内加密保存，浏览器不会再次读取原值。
@@ -152,7 +156,7 @@ Serverless Webmail：
   不会为搜索额外下载或持久化 Gmail 正文。
 - 每 5 分钟由 Cron 错峰加入 Queue，同一账号通过短时租约避免并发同步；账号失败不会阻断
   其他 Gmail 账号或 OmniMail 主邮箱。
-- 应用专用密码使用独立的 `GMAIL_CREDENTIALS_KEY` 进行 AES-GCM 加密，密文上下文绑定
+- 应用专用密码使用 `MAIL_CREDENTIALS_KEY`（或兼容的 `GMAIL_CREDENTIALS_KEY`）进行 AES-GCM 加密，密文上下文绑定
   用户、账号和字段；API 只返回 `hasAppPassword: true`。
 
 #### Gmail 使用注意事项
@@ -194,7 +198,7 @@ Serverless Webmail：
   读取且不持久化。打开正文后仅尝试精确写入 `\\Seen`，不支持移动、删除、归档或星标。
 - 可从所选 QQ 账号向单个收件人新建或回复邮件；写信时可选择已验证身份，发件固定连接
   `smtp.qq.com:465` 直接 TLS，并复用 Queue、幂等、限速和审计链路。
-- 授权码由独立的 `QQ_MAIL_CREDENTIALS_KEY` 使用 AES-GCM 加密，API 只返回
+- 授权码由 `MAIL_CREDENTIALS_KEY`（或兼容的 `QQ_MAIL_CREDENTIALS_KEY`）使用 AES-GCM 加密，API 只返回
   `hasAuthorizationCode: true`；单账号故障不会阻断其他账号或其他邮件工作区。
 
 部署和真实账号验收步骤见 [QQ 邮箱设置指南](docs/QQ_MAIL_SETUP.md)。
@@ -206,7 +210,7 @@ Serverless Webmail：
 - 首次索引最近 100 封、每账号最多保留 500 封 INBOX 元数据，默认每 15 分钟加入同步 Queue；
   正文与最大 5 MiB 附件按需读取且不持久化。
 - 打开正文后仅尝试精确写入 `\\Seen`；不支持发信、删除、移动、归档、星标或文件夹管理。
-- 应用专用密码由独立的 `NAVER_MAIL_CREDENTIALS_KEY` 使用 AES-GCM 加密，API 只返回
+- 应用专用密码由 `MAIL_CREDENTIALS_KEY`（或兼容的 `NAVER_MAIL_CREDENTIALS_KEY`）使用 AES-GCM 加密，API 只返回
   `hasAppPassword: true`。入口默认隐藏，生产开放前必须完成真实 Worker 登录和 24 小时稳定性观察。
 
 部署、灰度闸门和真实账号验收步骤见 [NAVER Mail 设置指南](docs/NAVER_MAIL_SETUP.md)。
@@ -219,7 +223,7 @@ Serverless Webmail：
 - 首次索引最近 100 封、每账号最多保留 500 封 INBOX 元数据，默认每 15 分钟加入同步 Queue；
   正文与最大 5 MiB 附件按需读取且不持久化。
 - 打开正文后仅尝试精确写入 `\Seen`；不支持发信、删除、移动、归档、星标或文件夹管理。
-- 应用密码由独立 `YANDEX_MAIL_CREDENTIALS_KEY` 使用 AES-GCM 加密；入口和部署开关默认关闭。
+- 应用密码由 `MAIL_CREDENTIALS_KEY`（或兼容的 `YANDEX_MAIL_CREDENTIALS_KEY`）使用 AES-GCM 加密；入口和部署开关默认关闭。
 
 部署和灰度验收步骤见 [Yandex Mail 设置指南](docs/YANDEX_MAIL_SETUP.md)。
 
@@ -384,9 +388,10 @@ Import a repository**，选择你的 OmniMail 仓库：
 [`wrangler.jsonc`](./wrangler.jsonc) 完成两件事：
 
 1. `npm run build` 将 React 前端生成到 `dist/`。
-2. `npm run deploy` 检查并应用尚未执行的 D1 迁移，再由 Wrangler 将 `dist/`、Worker
-   API、D1、R2、Queue、Workflow 和定时任务作为同一个 Worker 版本发布。如果首次部署
-   的 D1 尚未创建，则先发布 Worker 以自动创建并绑定资源，再初始化数据库并校验迁移记录。
+2. `npm run deploy` 先读取目标 Worker 的实际 `DB` 绑定 ID，检查并应用尚未执行的 D1
+   迁移，再由 Wrangler 将 `dist/`、Worker API、资源和定时任务作为同一个 Worker 版本发布。
+   首次自动创建的 D1 数据库统一命名为 `omni-mail-db`；先创建并绑定资源，再按实际 ID
+   初始化数据库并校验迁移记录。已有用户的数据库名称及数据保持原样。
    在此首次初始化完成前，API 可能短暂提示数据库迁移未完成。
 
 部署命令请使用 **`npm run deploy`**。单独运行 `npx wrangler deploy` 只发布 Worker，
@@ -398,6 +403,23 @@ Import a repository**，选择你的 OmniMail 仓库：
 SQL；远端已经成功但响应丢失时，不会重复执行已记录的迁移。权限、配置或 SQL 错误会
 显示具体原因并停止；例如构建 API Token 需要具备相应账户的 **D1 编辑权限**。
 首次资源创建成功但迁移失败时，修复原因后重新运行同一命令可继续完成部署。
+
+#### D1 名称与绑定兼容
+
+Worker 默认名称是 `omni-mail`，代码中的 D1 绑定名始终是 `DB`。首次自动创建数据库使用
+`omni-mail-db`；已有用户的库即使叫 `omnimail-db` 或其他名称，也会按线上 `DB` 实际绑定的
+数据库 ID 迁移和部署，不要求改名。`npm run db:migrate` 的远程迁移同样先解析实际绑定。
+
+部署脚本会识别 Workers Builds 的实际 Worker 名称覆盖，保留 `--env`、`--config`、
+`--env-file` 和 `--profile`，在源配置旁生成本次使用的临时配置；两步共用同一个数据库 ID，
+结束后删除临时文件，不改写仓库的 `wrangler.jsonc`。
+
+已有 Worker 缺少 `DB`、显式 `database_id` 与线上绑定冲突、无法唯一确定账户或权限不足时，
+脚本会停止并提示核对。首次部署遇到已有同名 `omni-mail-db` 时也不会擅自复用；如确实要
+使用它，请核对数据后在自己的配置中填写该库的 `database_id`。无需删除或重建原数据库。
+
+构建凭据需可读取目标 Worker 绑定，并具备目标账户的 D1 编辑权限。无法确定账户时设置
+`CLOUDFLARE_ACCOUNT_ID`；账户 ID 和 Worker 名称等部署目标变量使用明确值，不使用环境插值。
 
 `npm run deploy -- --dry-run` 只做打包预检，不执行远程数据库迁移或创建资源。
 使用命名环境时，`npm run deploy -- --env staging` 会将环境同时传给迁移和发布步骤。
@@ -467,6 +489,7 @@ Worker 文件，剩余路径仍会匹配 `*` 并正常部署。Build watch paths
 | `SENDFLARE_FROM` | Text | 可选固定发件邮箱地址，例如 `reply@example.com` |
 | `SENDFLARE_DOMAIN_CONFIGS` | Secret | 按发件域名配置独立的 SendFlare API Key 与可选发件邮箱 |
 | `TOTP_ENCRYPTION_KEY` | Secret | 至少 32 个随机字符，用于加密管理员 TOTP 密钥 |
+| `MAIL_CREDENTIALS_KEY` | Secret | 推荐：至少 32 个随机 UTF-8 字节，统一加密全部外部邮箱凭据；旧部署可继续使用下列独立密钥 |
 | `ICLOUD_CREDENTIALS_KEY` | Secret | 至少 32 字节，用于加密 iCloud Cookie 与应用专用密码；不使用 iCloud 功能时可留空 |
 | `LINUX_DO_MAIL_CREDENTIALS_KEY` | Secret | 至少 32 字节，用于加密 Linux DO Mail 密码或认证令牌；不使用该功能时可留空 |
 | `GMAIL_CREDENTIALS_KEY` | Secret | 至少 32 字节，只用于加密 Gmail 应用专用密码；不使用该功能时可留空 |
@@ -589,8 +612,8 @@ Builds 检测到分支更新后会自动构建、迁移并重新部署。
 管理员随后可在 **系统设置 → 外部注册** 中选择“仅 Linux DO”。现有账号仍可使用
 邮箱密码登录；公开注册的新用户默认可在已启用域名中选择 1 个尚未占用的邮箱地址。
 
-若要启用独立的 **Linux DO 邮箱** 工作区，另行配置
-`LINUX_DO_MAIL_CREDENTIALS_KEY`。每个 OmniMail 用户可连接一个完整的 `@linux.do`
+若要启用独立的 **Linux DO 邮箱** 工作区，配置统一
+`MAIL_CREDENTIALS_KEY`（兼容原 `LINUX_DO_MAIL_CREDENTIALS_KEY`）。每个 OmniMail 用户可连接一个完整的 `@linux.do`
 邮箱用户名，并填写密码或认证令牌；推荐使用 Linux DO Mail 提供的可撤销专用令牌。
 工作区按用户操作读取 INBOX 最近 20 封邮件和单封正文，不执行后台同步。已连接账号可
 通过官方 SMTP 465 向单个收件人发信，`From` 固定为已验证的账号地址，并复用现有队列、
@@ -598,35 +621,48 @@ Builds 检测到分支更新后会自动构建、迁移并重新部署。
 密码或认证令牌；验证失败时仍保留原凭据。
 
 若要启用独立的 **Gmail 聚合收件箱**，配置至少 32 字节的
-`GMAIL_CREDENTIALS_KEY`，部署并完成 D1 迁移。用户随后从左侧 Gmail 入口创建或粘贴一个
+`MAIL_CREDENTIALS_KEY`，部署并完成 D1 迁移。用户随后从左侧 Gmail 入口创建或粘贴一个
 Google 应用专用密码；连接验证成功后，Worker 会异步建立最近邮件索引。管理员可在
 **系统设置 → 邮箱功能入口** 中隐藏或恢复入口，隐藏不会删除已保存账号或索引。
 
 若要启用独立的 **Microsoft 邮箱**，配置至少 32 字节的
-`MICROSOFT_CREDENTIALS_KEY`，部署并应用 `0027_microsoft_imap.sql` 与
+`MAIL_CREDENTIALS_KEY`，部署并应用 `0027_microsoft_imap.sql` 与
 `0028_microsoft_oauth_combination_password.sql`。用户使用 OAuth2 refresh token + Client ID
 连接；不再接受仅邮箱密码登录。四字段组合 password 经确认后独立加密留存，但不参与认证。
 Worker 只访问 Microsoft 官方 OAuth 与 IMAP 端点；批量导入文本会在浏览器中解析为结构化字段，
 不会发送给第三方服务。管理员同样可在 **系统设置 → 邮箱功能入口** 中隐藏入口。
 
 若要启用独立的 **QQ 邮箱聚合收件箱**，配置至少 32 字节的
-`QQ_MAIL_CREDENTIALS_KEY`，部署并应用到 `0030_qq_mail_smtp.sql`。用户需要先在 QQ 邮箱设置中
+`MAIL_CREDENTIALS_KEY`，部署并应用到 `0030_qq_mail_smtp.sql`。用户需要先在 QQ 邮箱设置中
 开启 IMAP/SMTP 服务并生成授权码，再从左侧 QQ 邮箱入口连接个人 `@qq.com` 邮箱。
 升级到包含邮箱身份的版本时还会应用 `0031_qq_mail_identities.sql`；账号设置中可添加同一
 QQ 收件箱下的英文、Foxmail 或 VIP 地址，服务端会先验证 QQ SMTP 登录且不会发送测试邮件。
 管理员可在 **系统设置 → 邮箱功能入口** 中隐藏入口；隐藏不会删除账号、密文或索引。
 
 若要灰度启用独立的 **NAVER 邮箱聚合收件箱**，配置至少 32 字节的
-`NAVER_MAIL_CREDENTIALS_KEY` 并应用 `0033_naver_mail_imap.sql`。完成实际生产 Worker 登录和
+`MAIL_CREDENTIALS_KEY` 并应用 `0033_naver_mail_imap.sql`。完成实际生产 Worker 登录和
 至少 24 小时低频稳定性观察前，保持 `NAVER_MAIL_IMAP_ENABLED=false`；验收通过后设为 `true`，
 再由管理员从 **系统设置 → 邮箱功能入口** 显式开放 NAVER 入口。用户只能连接个人
 `@naver.com` 邮箱，且必须使用 NAVER 应用专用密码。
 
 若要灰度启用独立的 **Yandex 邮箱聚合收件箱**，配置至少 32 字节的
-`YANDEX_MAIL_CREDENTIALS_KEY` 并应用 `0034_yandex_mail_imap.sql`。先保持
+`MAIL_CREDENTIALS_KEY` 并应用 `0034_yandex_mail_imap.sql`。先保持
 `YANDEX_MAIL_IMAP_ENABLED=false` 完成实际 Worker 验证和至少 24 小时低频稳定性观察；验收后
 设为 `true`，再由管理员从 **系统设置 → 邮箱功能入口** 显式开放入口。首版仅接受个人
 `@yandex.com` 地址和 Yandex Mail 应用密码。
+
+### 统一邮箱加密密钥与兼容迁移
+
+新部署推荐只配置一个至少 32 个随机 UTF-8 字节的 `MAIL_CREDENTIALS_KEY` Secret，
+供 iCloud、Linux DO Mail、Gmail、Microsoft、QQ、NAVER、Yandex 共用。
+下文提到的各服务独立密钥仍兼容，未配置全局密钥的旧部署无需改变配置。
+
+升级后，主管理员打开收件箱首页，会看到“统一邮箱加密密钥”引导：在 Cloudflare 配置全局
+Secret 后重新检查，主动点击“开始 / 继续迁移”处理历史凭据。页面显示真实进度，支持暂停、
+关闭后继续；不运行定时或后台自动迁移。普通用户和其他管理员不看到该提示。
+
+迁移期间保留所有旧密钥；完成后核对历史备份和旧实例，再清理旧 Secret。
+具体步骤、并发与失败处理、回滚限制见 [邮箱密钥配置与迁移](docs/MAIL_CREDENTIALS.md)。
 
 ### 备份、保留与配额
 
