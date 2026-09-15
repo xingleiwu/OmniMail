@@ -51,7 +51,7 @@
 
 | 产品层 | 当前版本 | 支持层级 | 职责与兼容关系 |
 | --- | --- | --- | --- |
-| Web + Worker API | [`1.1.0`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/v1.1.0) | 稳定兼容基线 | 核心服务、Webmail、数据和所有邮箱来源；自托管实例的唯一服务端 |
+| Web + Worker API | [`1.1.1`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/v1.1.1) | 稳定兼容基线 | 核心服务、Webmail、数据和所有邮箱来源；自托管实例的唯一服务端 |
 | OmniMail Float | [`1.0.0`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/float-v1.0.0) | 稳定兼容基线 | Chrome Manifest V3 浏览器协作层；连接 Web/API `1.x`，不直连第三方邮箱 |
 | Android | [`0.3.0`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/android-v0.3.0) | 独立预览版 | 原生移动客户端；仍处于 `0.x`，兼容承诺和发布节奏独立于 Web/Float |
 
@@ -67,6 +67,8 @@
 
 ### 1.x 兼容边界
 
+- Web `1.1.0 → 1.1.1` 修复首次部署与 D1 定位，不新增数据库迁移、变量、Secret 或 API 变更。
+  更新代码后使用 `npm run deploy`；详见 [Web 1.1.1 发布说明](docs/releases/web/v1.1.1.md)。
 - Web `1.0.2 → 1.1.0` 需要应用 `0036`、`0037` 数据库迁移，使用 `npm run deploy` 自动处理。
   全局密钥为可选配置，旧独立密钥继续兼容；启用全局密钥后须保留旧密钥直到历史凭据迁移完成。
   完整升级步骤与回滚限制见 [Web 1.1.0 发布说明](docs/releases/web/v1.1.0.md)。
@@ -414,9 +416,15 @@ Worker 默认名称是 `omni-mail`，代码中的 D1 绑定名始终是 `DB`。�
 `--env-file` 和 `--profile`，在源配置旁生成本次使用的临时配置；两步共用同一个数据库 ID，
 结束后删除临时文件，不改写仓库的 `wrangler.jsonc`。
 
-已有 Worker 缺少 `DB`、显式 `database_id` 与线上绑定冲突、无法唯一确定账户或权限不足时，
-脚本会停止并提示核对。首次部署遇到已有同名 `omni-mail-db` 时也不会擅自复用；如确实要
-使用它，请核对数据后在自己的配置中填写该库的 `database_id`。无需删除或重建原数据库。
+Cloudflare 可能在首次构建前已创建 Worker 和初始化变量，但尚未绑定 `DB`。此时
+`npm run deploy` 会核对 `omni-mail-db` 和历史名称 `omnimail-db` 是否已存在；无冲突时
+自动创建并绑定 `omni-mail-db`，随后执行全部建表迁移并校验结果。账号中其他服务的 D1
+不影响首次部署，不需要删除，也不会被自动选为 OmniMail 的数据库。
+
+Worker 缺少 `DB` 且存在上述同名库时，脚本会提示恢复绑定或在配置中显式填写确认过的
+`database_id`；不会自动复用。同样，使用自定义库名的旧部署若丢失绑定，应先恢复绑定或
+显式指定原库 ID。显式 ID 经核验后也可补齐缺失绑定。已有绑定类型或 ID 无效、显式 ID
+冲突、无法唯一确定账户或权限不足时仍会停止。无需删除或重建原数据库。
 
 构建凭据需可读取目标 Worker 绑定，并具备目标账户的 D1 编辑权限。无法确定账户时设置
 `CLOUDFLARE_ACCOUNT_ID`；账户 ID 和 Worker 名称等部署目标变量使用明确值，不使用环境插值。
